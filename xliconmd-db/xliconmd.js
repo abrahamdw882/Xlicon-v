@@ -1069,8 +1069,8 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`Web server running at http:
-    console.log(` Session folder: ${path.resolve(AUTH_FOLDER)}`);
+    console.log(`Web server running at http://localhost:${PORT}`);
+    console.log(`Session folder: ${path.resolve(AUTH_FOLDER)}`);
     loadPrefix();
 });
 
