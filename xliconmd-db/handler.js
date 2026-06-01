@@ -1,4 +1,6 @@
 const { downloadMediaMessage } = require('@whiskeysockets/baileys')
+const groupMetadataCache = new Map()
+const CACHE_TTL = 5 * 60 * 1000 
 
 function normalizeJid(jid = '') {
     return String(jid).split(':')[0]
@@ -30,6 +32,24 @@ function checkDev(sender = '') {
     return devIds.includes(user)
 }
 
+async function getCachedGroupMetadata(sock, groupId) {
+    const cached = groupMetadataCache.get(groupId)
+    const now = Date.now()
+    
+    if (cached && (now - cached.timestamp) < CACHE_TTL) {
+        return cached.data
+    }
+    
+    const metadata = await sock.groupMetadata(groupId).catch(() => null)
+    if (metadata) {
+        groupMetadataCache.set(groupId, {
+            data: metadata,
+            timestamp: now
+        })
+    }
+    return metadata
+}
+
 async function serializeMessage(sock, msg) {
     const from = msg.key?.remoteJid || ''
     const isGroup = from.endsWith('@g.us')
@@ -42,84 +62,76 @@ async function serializeMessage(sock, msg) {
     let body = ''
     const type = Object.keys(msg.message || {})[0] || ''
 
-    if (msg.message?.interactiveResponseMessage) {
-        body =
-            msg.message.interactiveResponseMessage.buttonId ||
-            msg.message.interactiveResponseMessage?.body?.text ||
-            ''
-    }
-    else if (msg.message?.conversation) {
-        body = msg.message.conversation
-    }
-    else if (msg.message?.extendedTextMessage?.text) {
-        body = msg.message.extendedTextMessage.text
-    }
-    else if (msg.message?.imageMessage?.caption) {
-        body = msg.message.imageMessage.caption
-    }
-    else if (msg.message?.videoMessage?.caption) {
-        body = msg.message.videoMessage.caption
-    }
-    else if (msg.message?.documentMessage?.caption) {
-        body = msg.message.documentMessage.caption
-    }
-    else if (msg.message?.buttonsResponseMessage?.selectedButtonId) {
-        body = msg.message.buttonsResponseMessage.selectedButtonId
-    }
-    else if (msg.message?.listResponseMessage?.singleSelectReply?.selectedRowId) {
-        body = msg.message.listResponseMessage.singleSelectReply.selectedRowId
-    }
-    else if (msg.message?.templateButtonReplyMessage?.selectedId) {
-        body = msg.message.templateButtonReplyMessage.selectedId
+    const msgContent = msg.message
+    if (msgContent?.conversation) {
+        body = msgContent.conversation
+    } else if (msgContent?.extendedTextMessage?.text) {
+        body = msgContent.extendedTextMessage.text
+    } else if (msgContent?.imageMessage?.caption) {
+        body = msgContent.imageMessage.caption
+    } else if (msgContent?.videoMessage?.caption) {
+        body = msgContent.videoMessage.caption
+    } else if (msgContent?.documentMessage?.caption) {
+        body = msgContent.documentMessage.caption
+    } else if (msgContent?.interactiveResponseMessage) {
+        body = msgContent.interactiveResponseMessage.buttonId ||
+               msgContent.interactiveResponseMessage?.body?.text || ''
+    } else if (msgContent?.buttonsResponseMessage?.selectedButtonId) {
+        body = msgContent.buttonsResponseMessage.selectedButtonId
+    } else if (msgContent?.listResponseMessage?.singleSelectReply?.selectedRowId) {
+        body = msgContent.listResponseMessage.singleSelectReply.selectedRowId
+    } else if (msgContent?.templateButtonReplyMessage?.selectedId) {
+        body = msgContent.templateButtonReplyMessage.selectedId
     }
 
     const isMedia = ['imageMessage', 'videoMessage', 'documentMessage', 'audioMessage', 'stickerMessage'].includes(type)
     const mediaType = type ? type.replace('Message', '').toLowerCase() : ''
-    const mimetype = msg.message?.[type]?.mimetype || null
-
-    const groupMetadata = isGroup
-        ? await sock.groupMetadata(from).catch(() => null)
-        : null
-
-    const groupParticipants = Array.isArray(groupMetadata?.participants)
-        ? groupMetadata.participants
-        : []
-
+    const mimetype = msgContent?.[type]?.mimetype || null
     const senderNormalized = normalizeJid(sender)
     const botNormalized = normalizeJid(sock.user?.id || sock.user?.lid || '')
     const senderNumber = getNumberFromJid(sender)
-
-    const participantData = groupParticipants.find(p => {
-        const pid = normalizeJid(p?.id || p?.jid || '')
-        return pid === senderNormalized
-    })
-
-    const botData = groupParticipants.find(p => {
-        const pid = normalizeJid(p?.id || p?.jid || '')
-        return pid === botNormalized
-    })
-
-    const groupOwnerId = normalizeJid(
-        groupMetadata?.owner ||
-        groupMetadata?.subjectOwner ||
-        ''
-    )
+    let groupMetadata = null
+    let groupParticipants = []
+    let participantData = null
+    let botData = null
+    let groupOwnerId = ''
+    let isAdmin = false
+    let isBotAdmin = false
+    let isGroupOwner = false
+    if (isGroup) {
+        groupMetadata = await getCachedGroupMetadata(sock, from)
+        
+        if (groupMetadata) {
+            groupParticipants = groupMetadata.participants || []
+            groupOwnerId = normalizeJid(
+                groupMetadata.owner ||
+                groupMetadata.subjectOwner ||
+                ''
+            )
+            for (const p of groupParticipants) {
+                const pid = normalizeJid(p?.id || p?.jid || '')
+                if (pid === senderNormalized) {
+                    participantData = p
+                    isAdmin = !!p.admin
+                    isGroupOwner = senderNormalized === groupOwnerId
+                }
+                if (pid === botNormalized) {
+                    botData = p
+                    isBotAdmin = !!p.admin
+                }
+                if (participantData && botData) break 
+            }
+        }
+    }
 
     const isOwner = checkOwner(sender, sock.user)
-    const isDev = checkDev(sender)  
-    const isAdmin = isGroup ? !!participantData?.admin : false
-    const isBotAdmin = isGroup ? !!botData?.admin : false
-    const isGroupOwner = isGroup
-        ? senderNormalized === groupOwnerId ||
-          normalizeJid(participantData?.id || participantData?.jid || '') === groupOwnerId
-        : false
+    const isDev = checkDev(sender)
 
     let quoted
-    const ctxInfo =
-        msg.message?.extendedTextMessage?.contextInfo ||
-        msg.message?.imageMessage?.contextInfo ||
-        msg.message?.videoMessage?.contextInfo ||
-        msg.message?.documentMessage?.contextInfo
+    const ctxInfo = msgContent?.extendedTextMessage?.contextInfo ||
+                    msgContent?.imageMessage?.contextInfo ||
+                    msgContent?.videoMessage?.contextInfo ||
+                    msgContent?.documentMessage?.contextInfo
 
     if (ctxInfo?.quotedMessage) {
         const qMsg = ctxInfo.quotedMessage
@@ -153,8 +165,8 @@ async function serializeMessage(sock, msg) {
         }
     }
 
-    return {
-        key: msg.key,  // Add this line
+    const messageObject = {
+        key: msg.key,
         id: msg.key?.id,
         from,
         sender,
@@ -175,8 +187,8 @@ async function serializeMessage(sock, msg) {
         isAdmin,
         isBotAdmin,
         isGroupOwner,
-        isButtonResponse: !!msg.message?.interactiveResponseMessage,
-        buttonId: msg.message?.interactiveResponseMessage?.buttonId || null,
+        isButtonResponse: !!msgContent?.interactiveResponseMessage,
+        buttonId: msgContent?.interactiveResponseMessage?.buttonId || null,
         reply: async (content, options = {}) => {
             if (typeof content === 'string') {
                 return await sock.sendMessage(from, { text: content, ...options }, { quoted: msg })
@@ -208,6 +220,17 @@ async function serializeMessage(sock, msg) {
                 ? await downloadMediaMessage(msg, 'buffer', {}, sock)
                 : (quoted?.isMedia ? await quoted.download() : null)
     }
+    
+    return messageObject
 }
+
+setInterval(() => {
+    const now = Date.now()
+    for (const [key, value] of groupMetadataCache.entries()) {
+        if (now - value.timestamp > CACHE_TTL) {
+            groupMetadataCache.delete(key)
+        }
+    }
+}, 60 * 1000) // Clean every minute
 
 module.exports = serializeMessage
