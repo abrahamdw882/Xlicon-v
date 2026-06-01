@@ -52,18 +52,15 @@ module.exports = {
             await m.reply('⏳ `ɢᴇɴᴇʀᴀᴛɪɴɢ ᴛᴇxᴛ ᴇꜰꜰᴇᴄᴛ...`');
 
             const apiUrl = `https://api-abztech.zone.id/tools/textpro?text=${encodeURIComponent(text)}&style=${style}`;
-            const res = await axios.get(apiUrl);
+            
+            const imageBuffer = await axios.get(apiUrl, {
+                responseType: 'arraybuffer'
+            }).then(res => res.data);
 
-            if (!res.data.status || !res.data.abztech) {
-                return await m.reply('❌ ꜰᴀɪʟᴇᴅ ᴛᴏ ɢᴇɴᴇʀᴀᴛᴇ ɪᴍᴀɢᴇ. ᴛʀʏ ᴀɢᴀɪɴ ʟᴀᴛᴇʀ.');
-            }
-
-            const imageBuffer = (await axios.get(res.data.abztech, { responseType: 'arraybuffer' })).data;
-
-            const caption = `┌─ム *${res.data.style.toUpperCase()} TEXT EFFECT*
+            const caption = `┌─ム *${style.toUpperCase()} TEXT EFFECT*
 │
-│ ᪣ ᴛᴇxᴛ: ${res.data.text}
-│ ᪣ ꜱᴛʏʟᴇ: ${res.data.style}
+│ ᪣ ᴛᴇxᴛ: ${text}
+│ ᪣ ꜱᴛʏʟᴇ: ${style}
 │
 │ ᴘᴏᴡᴇʀᴇᴅ ʙʏ xʟɪᴄᴏɴᴠ2
 ╰─────────◆────────╯`;
