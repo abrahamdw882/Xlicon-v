@@ -5,7 +5,7 @@ module.exports = {
     description: 'Ask AI any question',
     aliases: ['ask'],
     tags: ['ai'],
-    command: /^\.?(ai|ask)/i,
+    command: /^\.?(ai|gideon)/i,
 
     async execute(sock, m, args) {
         try {
