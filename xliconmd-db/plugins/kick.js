@@ -9,12 +9,8 @@ module.exports = {
             return await m.reply('❌ This command only works in groups!')
         }
 
-        if (!m.isAdmin) {
+        if (!m.isAdmin && !m.isOwner) {
             return await m.reply('❌ Admin only command!')
-        }
-
-        if (!m.isBotAdmin) {
-            return await m.reply('❌ Bot must be admin!')
         }
 
         let user
