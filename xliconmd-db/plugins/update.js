@@ -12,10 +12,10 @@ module.exports = {
     async execute(sock, m) {
         try {
             if (!m.isOwner) {
-                return await m.reply('⚠️ This command is made for my owner.')
+                return await m.reply('⚠️ ᴛʜɪs ᴄᴏᴍᴍᴀɴᴅ ɪs ᴍᴀᴅᴇ ғᴏʀ ᴍʏ ᴏᴡɴᴇʀ.')
             }
 
-            await m.reply('♻️ Updating bot...\n🗑️ Deleting old files...')
+            await m.reply('🔄 ᴜᴘᴅᴀᴛɪɴɢ ʙᴏᴛ...\n🗑️ ʀᴇᴍᴏᴠɪɴɢ ᴏʟᴅ ғɪʟᴇs...')
 
             const base = path.join(__dirname, '..')
             const targets = ['plugins', 'lib', 'handler.js', 'xliconmd.js']
@@ -26,19 +26,19 @@ module.exports = {
                 if (fs.existsSync(targetPath)) {
                     fs.rmSync(targetPath, { recursive: true, force: true })
                     deleted.push(file)
-                    console.log(`🗑️ Deleted: ${file}`)
+                    console.log(`🗑️ Removed: ${file}`)
                 }
             }
 
-            await m.reply(`✅ Deleted:\n${deleted.map(v => `• ${v}`).join('\n')}\n\n📥 Downloading fresh files...`)
+            await m.reply(`✅ ʀᴇᴍᴏᴠᴇᴅ:\n${deleted.map(v => `• ${v}`).join('\n')}\n\n📦 ғᴇᴛᴄʜɪɴɢ ʟᴀᴛᴇsᴛ ғɪʟᴇs...`)
 
-            // NOW DOWNLOAD THE FILES BACK
+            // Fetch fresh files from GitHub
             const user = 'abrahamdw882'
             const repo = 'xlicon-v'
             const branch = 'main'
             const githubFolderPath = 'xliconmd-db'
 
-            async function downloadFolder(folderPath, localPath) {
+            async function fetchFolder(folderPath, localPath) {
                 const url = `https://api.github.com/repos/${user}/${repo}/contents/${folderPath}?ref=${branch}`
                 const { data } = await axios.get(url, { headers: { 'User-Agent': 'axios' } })
 
@@ -49,17 +49,17 @@ module.exports = {
                         fs.mkdirSync(path.dirname(localFilePath), { recursive: true })
                         const fileData = await axios.get(item.download_url, { responseType: 'text' })
                         fs.writeFileSync(localFilePath, fileData.data, 'utf8')
-                        console.log(`✅ Downloaded: ${item.name}`)
+                        console.log(`✅ Restored: ${item.name}`)
                     } else if (item.type === 'dir') {
                         fs.mkdirSync(localFilePath, { recursive: true })
-                        await downloadFolder(item.path, localPath)
+                        await fetchFolder(item.path, localPath)
                     }
                 }
             }
 
-            await downloadFolder(githubFolderPath, base)
+            await fetchFolder(githubFolderPath, base)
             
-            await m.reply('✅ Files re-downloaded successfully!\n\n🔄 Restarting bot...')
+            await m.reply('✅ ғɪʟᴇs ʀᴇsᴛᴏʀᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ!\n\n🔄 ʀᴇʙᴏᴏᴛɪɴɢ ʙᴏᴛ...')
             
             setTimeout(() => {
                 process.exit(0)
@@ -67,7 +67,7 @@ module.exports = {
 
         } catch (err) {
             console.error(err)
-            await m.reply(`❌ Update failed:\n\`\`\`\n${err.message}\n\`\`\``)
+            await m.reply(`❌ ᴜᴘᴅᴀᴛᴇ ғᴀɪʟᴇᴅ:\n\`\`\`\n${err.message}\n\`\`\``)
         }
     }
 }
