@@ -1,5 +1,5 @@
 require('./config')
-//these imports are very necessary for baileys 
+//these imports are very necessary for baileys 😗
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage, generateWAMessageContent, generateWAMessageFromContent, generateMessageID, prepareWAMessageMedia, fetchLatestWaWebVersion, proto,generateProfilePicture } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
