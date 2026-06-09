@@ -22,7 +22,7 @@ module.exports = {
 
             if (!number) {
                 return await m.reply(
-                    'Use:\n.add 234xxxxxxxxxx'
+                    'Use:\n.add 233xxxxxxxxxx'
                 )
             }
 
