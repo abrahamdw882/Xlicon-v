@@ -9,7 +9,7 @@ module.exports = {
         try {
             const name = m.pushName || m.sender.split('@')[0];
             const audioUrl = 'https://files.catbox.moe/tcz5xk.mp3';
-            const thumbnail = 'https://i.ibb.co/BVmdwyv8/IMG-20260417-WA0030.jpg';
+
             const quoted = {
                 key: {
                     fromMe: false,
@@ -23,6 +23,7 @@ module.exports = {
                     },
                 },
             };
+
             await m.send(
                 {
                     audio: { url: audioUrl },
@@ -30,22 +31,11 @@ module.exports = {
                     ptt: false,
                     waveform: [100, 0, 100, 0, 100, 0, 100],
                     fileName: 'Alive',
-                    contextInfo: {
-                        mentionedJid: [m.sender],
-                        externalAdReply: {
-                            title: 'I AM ALIVE',
-                            body: 'BOT STATUS',
-                            thumbnailUrl: thumbnail,
-                            sourceUrl: 'https://www.whatsapp.com/channel/0029VaMGgVL3WHTNkhzHik3c',
-                            mediaType: 1,
-                            renderLargerThumbnail: true,
-                        },
-                    },
                 },
                 { quoted }
             );
         } catch (err) {
-            console.error('❌ Alive plugin error:', err);
+            console.error(' Alive plugin error:', err);
         }
     },
 };
