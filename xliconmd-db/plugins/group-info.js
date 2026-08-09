@@ -8,11 +8,11 @@ module.exports = {
     command: /^.?(ginfo|groupinfo)$/i,
 
     async execute(sock, m, args) {
-        const link = args.join(" ").trim();
+        const link = args.join(' ').trim();
 
         if (!link) {
             return m.reply(
-                "Usage:\n.ginfo <group invite link>\n\nExample:\n.ginfo https://chat.whatsapp.com/XXXXXXXXXXXX"
+                'Usage:\n.ginfo <group invite link>\n\nExample:\n.ginfo https://chat.whatsapp.com/XXXXXXXXXXXX'
             );
         }
 
@@ -21,7 +21,10 @@ module.exports = {
                 return m.reply('Please provide a valid WhatsApp group invite link.');
             }
 
-            const code = link.split('chat.whatsapp.com/')[1].split('?')[0].trim();
+            const code = link
+                .split('chat.whatsapp.com/')[1]
+                .split('?')[0]
+                .trim();
 
             if (!code) {
                 return m.reply('Invalid group invite link.');
@@ -33,8 +36,6 @@ module.exports = {
                 return m.reply('Unable to retrieve group information.');
             }
 
-            const pp = await sock.profilePictureUrl(r.id, 'image').catch(() => null);
-
             const info = `
 *Group Info:*
 
@@ -43,40 +44,41 @@ module.exports = {
 - *Description:* ${r.desc || 'None'}
 - *Owner:* ${r.owner || 'Unknown'}
 - *Participants:* ${r.participants?.length || 0}
-- *Disappearing Messages:* ${r.ephemeralDuration ? r.ephemeralDuration + 's' : 'Off'}
+- *Disappearing Messages:* ${
+                r.ephemeralDuration ? r.ephemeralDuration + 's' : 'Off'
+            }
 - *Announce Only:* ${r.announce ? 'Yes' : 'No'}
 - *Restricted Settings:* ${r.restrict ? 'Yes' : 'No'}
-- *Member Add Mode:* ${r.memberAddMode ? 'All members' : 'Admins only'}
-- *Join Approval:* ${r.joinApprovalMode ? 'Required' : 'Not required'}
+- *Member Add Mode:* ${
+                r.memberAddMode ? 'All members' : 'Admins only'
+            }
+- *Join Approval:* ${
+                r.joinApprovalMode ? 'Required' : 'Not required'
+            }
 `.trim();
 
+            const pp = await sock
+                .profilePictureUrl(r.id, 'image')
+                .catch(() => null);
+
             if (pp) {
-                const response = await axios.get(pp, {
-                    responseType: 'arraybuffer'
+                const imageBuffer = (
+                    await axios.get(pp, {
+                        responseType: 'arraybuffer'
+                    })
+                ).data;
+
+                await m.reply(imageBuffer, {
+                    caption: info
                 });
-
-                const buffer = Buffer.from(response.data);
-
-                await sock.sendMessage(
-                    m.from,
-                    {
-                        image: buffer,
-                        caption: info
-                    },
-                    { quoted: m }
-                );
             } else {
-                await sock.sendMessage(
-                    m.from,
-                    {
-                        text: info + '\n- *Profile Picture:* None'
-                    },
-                    { quoted: m }
+                await m.reply(
+                    info + '\n- *Profile Picture:* None'
                 );
             }
 
         } catch (err) {
-            console.error('❌ GINFO error:', err);
+            console.error('GINFO error:', err);
 
             return m.reply(
                 'Failed to retrieve group information. The invite link may be invalid, expired, or the group may no longer be accessible.'
