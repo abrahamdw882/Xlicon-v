@@ -18,7 +18,7 @@ module.exports = {
         await m.reply(`⏳ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ɪɴsᴛᴀɢʀᴀᴍ ᴄᴏɴᴛᴇɴᴛ...`);
         
         try {
-            const apiUrl = `https://api-rebix.zone.id/api/igdl?quality=480&url=${encodeURIComponent(url)}`;
+            const apiUrl = `https://api-abztech.zone.id/download/instadl?url=${encodeURIComponent(url)}&type=video`;
             
             const response = await axios({
                 method: 'get',
@@ -26,13 +26,21 @@ module.exports = {
                 timeout: 30000
             });
             
-            if (!response.data.status || !response.data.result) {
-                throw new Error('API returned error');
+            if (!response.data.status || !response.data.data) {
+                throw new Error(response.data.message || 'API returned error');
             }
             
-            const result = response.data.result;
-            const metadata = result.metadata;
-            const mediaUrl = result.url[0];
+            const data = response.data.data;
+            const metadata = data.metadata || {};
+            const media = data.media || {};
+            
+            const videoItem = media.videos?.[0];
+            if (!videoItem || !videoItem.url) {
+                throw new Error('No video URL found in response');
+            }
+            
+            const mediaUrl = videoItem.url;
+            const quality = videoItem.quality || 'HD';
             
             const mediaResponse = await axios({
                 method: 'get',
@@ -44,28 +52,25 @@ module.exports = {
             const buffer = Buffer.from(mediaResponse.data);
             
             const caption = `📸 *ɪɴsᴛᴀɢʀᴀᴍ ᴅᴏᴡɴʟᴏᴀᴅᴇʀ*\n\n` +
-                           `👤 *ᴜsᴇʀ:* ${metadata.username}\n` +
-                           `❤️ *ʟɪᴋᴇs:* ${metadata.like}\n` +
-                           `💬 *ᴄᴏᴍᴍᴇɴᴛs:* ${metadata.comment}\n` +
+                           `📹 *ǫᴜᴀʟɪᴛʏ:* ${quality}\n` +
+                           `📅 *ᴛɪᴍᴇ:* ${metadata.createTime || 'Unknown'}\n` +
                            `📝 *ᴄᴀᴘᴛɪᴏɴ:* ${metadata.caption || 'No caption'}\n\n` +
-                           `> ᴘᴏᴡᴇʀᴇᴅ ʙʏ sᴀᴍᴜᴇʟ-ʀᴇʙɪx`;
+                           `> ᴘᴏᴡᴇʀᴇᴅ ʙʏ ᴀʙᴢᴛᴇᴄʜ`;
             
-            if (metadata.isVideo) {
-                await m.reply(buffer, { 
-                    caption: caption,
-                    video: buffer,
-                    mimetype: 'video/mp4'
-                });
-            } else {
-                await m.reply(buffer, { 
-                    caption: caption,
-                    image: buffer
-                });
-            }
+            await m.reply(buffer, { 
+                caption: caption,
+                video: buffer,
+                mimetype: 'video/mp4'
+            });
             
         } catch (err) {
             console.error('instadl error:', err);
-            await m.reply(`❌ ғᴀɪʟᴇᴅ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ ɪɴsᴛᴀɢʀᴀᴍ ᴄᴏɴᴛᴇɴᴛ\n\n${err.message}`);
+            
+            if (err.response?.data) {
+                await m.reply(`❌ ғᴀɪʟᴇᴅ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ\n\n${err.response.data.message || JSON.stringify(err.response.data)}`);
+            } else {
+                await m.reply(`❌ ғᴀɪʟᴇᴅ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ\n\n${err.message}`);
+            }
         }
     }
 };
