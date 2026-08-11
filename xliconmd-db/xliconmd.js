@@ -1,6 +1,6 @@
 require('./config')
-//these imports are very necessary for baileys 😗
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage, generateWAMessageContent, generateWAMessageFromContent, generateMessageID, prepareWAMessageMedia, fetchLatestWaWebVersion, proto,generateProfilePicture } = require('@whiskeysockets/baileys');
+
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadMediaMessage, generateWAMessageContent, generateWAMessageFromContent, generateMessageID, prepareWAMessageMedia, fetchLatestWaWebVersion, proto, generateProfilePicture } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const fs = require('fs');
 const path = require('path');
@@ -27,6 +27,51 @@ global.Jimp = Jimp;
 global.generateProfilePicture = generateProfilePicture;
 global.downloadMediaMessage = downloadMediaMessage;
 global.bannedChats = global.bannedChats || [];
+
+const MESSAGE_FILE = path.join(__dirname, 'message.json')
+
+if (!fs.existsSync(MESSAGE_FILE)) {
+    fs.writeFileSync(MESSAGE_FILE, '{}')
+}
+
+function readMessageStore() {
+    try {
+        return JSON.parse(fs.readFileSync(MESSAGE_FILE, 'utf8'))
+    } catch {
+        return {}
+    }
+}
+
+function saveMessage(rawMsg) {
+    const key = rawMsg?.key
+
+    if (!key?.remoteJid || !key?.id || !rawMsg?.message) {
+        return
+    }
+
+    try {
+        const messages = readMessageStore()
+        const messageKey = `${key.remoteJid}:${key.id}`
+
+        messages[messageKey] = {
+            key: {
+                remoteJid: key.remoteJid,
+                id: key.id,
+                participant: key.participant || null,
+                fromMe: !!key.fromMe
+            },
+            message: rawMsg.message
+        }
+
+        fs.writeFileSync(
+            MESSAGE_FILE,
+            JSON.stringify(messages, null, 2)
+        )
+    } catch (error) {
+        console.error('❌ Message store error:', error.message)
+    }
+}
+
 if (!fs.existsSync(__dirname + '/session/creds.json') && global.sessionid) {
     try {
         const sessionData = JSON.parse(global.sessionid);
@@ -36,7 +81,7 @@ if (!fs.existsSync(__dirname + '/session/creds.json') && global.sessionid) {
         console.error('Error restoring session:', err);
     }
 }
-//this are the folders of auth,plugin  and right under is the port and am using 3000 
+
 const AUTH_FOLDER = './session';
 const PLUGIN_FOLDER = './plugins';
 const PORT = process.env.PORT || 3000;
@@ -49,6 +94,7 @@ let sock = null;
 let isConnecting = false;
 
 const processedStatusMessages = new Set()
+
 function resolveStatusTarget(sock, mek) {
     const candidates = [
         mek?.key?.participantPn,
@@ -153,7 +199,7 @@ function loadPrefix() {
     }
     startBot();
 }
-//this func starts the bot 
+
 function startBot() {
     console.log('Starting WhatsApp Bot...');
     isConnecting = true;
@@ -167,7 +213,6 @@ function startBot() {
         try {
             const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
             if (creds.noiseKey && creds.noiseKey.private) {
-                
                 console.log('📁 Using existing session...');
             } else {
                 console.log('⚠️ Invalid session detected, will create new one...');
@@ -192,7 +237,17 @@ function startBot() {
                 keepAliveIntervalMs: 10000,
                 markOnlineOnConnect: true,
                 syncFullHistory: false,
-                browser: ['Bot', 'Chrome', '1.0.0']
+                browser: ['Bot', 'Chrome', '1.0.0'],
+                getMessage: async key => {
+                    try {
+                        const messages = readMessageStore()
+                        const messageKey = `${key.remoteJid}:${key.id}`
+                        return messages[messageKey]?.message || undefined
+                    } catch (error) {
+                        console.error('❌ getMessage error:', error.message)
+                        return undefined
+                    }
+                }
             });
             
             sock.ev.on('connection.update', async (update) => {
@@ -310,66 +365,70 @@ function startBot() {
                 console.log('📁 No plugins folder found');
             }
            
-     sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify' && type !== 'append') return;
-   
-    const CHANNEL_ID = "120363230794474148@newsletter";
-    
-    for (const rawMsg of messages) {
-        if (rawMsg.key?.remoteJid === CHANNEL_ID && rawMsg.key?.server_id) {
-            const emojis = ["❤️", "💛", "👍", "💜", "😮", "🤍", "💙", "🔥", "💯", "⚡"];
-            const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-            
-            try {
-              
-                await sock.newsletterReactMessage(
-                    CHANNEL_ID, 
-                    rawMsg.key.server_id.toString(), 
-                    emoji
-                );
-                console.log(`✅ Channel reaction: ${emoji} to message ${rawMsg.key.server_id}`);
-            } catch (err) {
-                console.log("❌ Channel React Error:", err.message);
-            }
-            continue;
-        }
-    }
-         
-    for (const rawMsg of messages) {
-    await handleStatusWatcher(sock, rawMsg)
-   }
+            sock.ev.on('messages.upsert', async ({ messages, type }) => {
+                if (type !== 'notify' && type !== 'append') return;
+               
+                for (const rawMsg of messages) {
+                    saveMessage(rawMsg)
+                }
 
-    const rawMsg = messages[0];
-    if (!rawMsg.message) return;
+                const CHANNEL_ID = "120363230794474148@newsletter";
+                
+                for (const rawMsg of messages) {
+                    if (rawMsg.key?.remoteJid === CHANNEL_ID && rawMsg.key?.server_id) {
+                        const emojis = ["❤️", "💛", "👍", "💜", "😮", "🤍", "💙", "🔥", "💯", "⚡"];
+                        const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+                        
+                        try {
+                            await sock.newsletterReactMessage(
+                                CHANNEL_ID, 
+                                rawMsg.key.server_id.toString(), 
+                                emoji
+                            );
+                            console.log(`✅ Channel reaction: ${emoji} to message ${rawMsg.key.server_id}`);
+                        } catch (err) {
+                            console.log("❌ Channel React Error:", err.message);
+                        }
+                        continue;
+                    }
+                }
+                     
+                for (const rawMsg of messages) {
+                    await handleStatusWatcher(sock, rawMsg)
+                }
 
-    const m = await serializeMessage(sock, rawMsg);
+                const rawMsg = messages[0];
+                if (!rawMsg.message) return;
 
-    for (const plugin of plugins.values()) {
-        if (typeof plugin.onMessage === 'function') {
-            try { 
-                const blocked = await plugin.onMessage(sock, m);
-                if (blocked === true) return;
-            } catch (err) { 
-                console.error(`❌ onMessage error (${plugin.name}):`, err); 
-            }
-        }
-    }
+                const m = await serializeMessage(sock, rawMsg);
 
-    if (m.body && m.body.startsWith(global.BOT_PREFIX)) {
-        const args = m.body.slice(global.BOT_PREFIX.length).trim().split(/\s+/);
-        const commandName = args.shift().toLowerCase();
-        const plugin = plugins.get(commandName);
-        
-        if (plugin) {
-            try { 
-                await plugin.execute(sock, m, args); 
-            } catch (err) { 
-                console.error(`❌ Plugin error (${commandName}):`, err); 
-                await m.reply('❌ Error running command.'); 
-            }
-        }
-    }
-});
+                for (const plugin of plugins.values()) {
+                    if (typeof plugin.onMessage === 'function') {
+                        try { 
+                            const blocked = await plugin.onMessage(sock, m);
+                            if (blocked === true) return;
+                        } catch (err) { 
+                            console.error(`❌ onMessage error (${plugin.name}):`, err); 
+                        }
+                    }
+                }
+
+                if (m.body && m.body.startsWith(global.BOT_PREFIX)) {
+                    const args = m.body.slice(global.BOT_PREFIX.length).trim().split(/\s+/);
+                    const commandName = args.shift().toLowerCase();
+                    const plugin = plugins.get(commandName);
+                    
+                    if (plugin) {
+                        try { 
+                            await plugin.execute(sock, m, args); 
+                        } catch (err) { 
+                            console.error(`❌ Plugin error (${commandName}):`, err); 
+                            await m.reply('❌ Error running command.'); 
+                        }
+                    }
+                }
+            });
+
             sock.ev.on('group-participants.update', async (update) => {
                 try {
                     if (!global.welcomeConfig?.enabled) return
@@ -377,7 +436,6 @@ function startBot() {
                     const groupId = update.id
 
                     for (const participant of update.participants) {
-
                         const userId = typeof participant === 'string'
                             ? participant
                             : participant.phoneNumber || participant.id
@@ -387,7 +445,6 @@ function startBot() {
                         const memberName = userId.split('@')[0]
 
                         if (update.action === 'add') {
-
                             if (userId === sock.user.id) continue
 
                             const text = `👋 Welcome @${memberName}!\n🎉 Glad to have you in this group!`
@@ -398,14 +455,12 @@ function startBot() {
                             })
 
                         } else if (update.action === 'remove') {
-
                             const text = `ya @${memberName} has left the group.\nWe are not gonna miss you!`
 
                             await sock.sendMessage(groupId, {
                                 text,
                                 mentions: [userId]
                             })
-
                         }
                     }
 
@@ -425,7 +480,7 @@ function startBot() {
         }
     })();
 }
-//this is the front end  server of the bot 
+
 const server = http.createServer((req, res) => {
     const url = req.url;
     
@@ -1153,6 +1208,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
     console.log(`Web server running at http://localhost:${PORT}`);
     console.log(`Session folder: ${path.resolve(AUTH_FOLDER)}`);
+    console.log(`Message store: ${MESSAGE_FILE}`);
     loadPrefix();
 });
 
