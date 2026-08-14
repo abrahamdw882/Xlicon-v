@@ -1,13 +1,19 @@
 module.exports = {
     name: "crm",
     aliases: ["getmsg", "msgcode"],
+    tags: ["owner"],
+    command: /^\.?(crm|getmsg|msgcode)$/i,
 
     async execute(sock, m, args) {
         try {
+            if (!m.isOwner) {
+                return;
+            }
+
             const key = m.quoted?.key;
 
             if (!key) {
-                return await m.reply("⚠️ Please quote a message.");
+                return await m.reply("Please quote a message.");
             }
 
             let result = await sock.ws.config.getMessage(key);
@@ -17,7 +23,7 @@ module.exports = {
             }
 
             if (!result) {
-                return await m.reply("⚠️ Message not found.");
+                return await m.reply("Message not found.");
             }
 
             const additionalNodes = [
@@ -115,11 +121,18 @@ try {
 }
 `.trim();
 
-            await m.reply(fullCodeText);
+            if (fullCodeText.length > 65536) {
+                const chunks = fullCodeText.match(/[\s\S]{1,60000}/g) || [];
+                for (const chunk of chunks) {
+                    await m.reply(`\`\`\`javascript\n${chunk}\n\`\`\``);
+                }
+            } else {
+                await m.reply(`\`\`\`javascript\n${fullCodeText}\n\`\`\``);
+            }
 
         } catch (err) {
             console.error("crm error:", err);
-            await m.reply(`❌ Error: ${err.message}`);
+            await m.reply(`Error: ${err.message}`);
         }
     }
 };
