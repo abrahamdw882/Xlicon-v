@@ -1,8 +1,6 @@
 module.exports = {
     name: "crm",
     aliases: ["getmsg", "msgcode"],
-    tags: ["owner"],
-    command: /^\.?(crm|getmsg|msgcode)$/i,
 
     async execute(sock, m, args) {
         try {
@@ -121,14 +119,7 @@ try {
 }
 `.trim();
 
-            if (fullCodeText.length > 65536) {
-                const chunks = fullCodeText.match(/[\s\S]{1,60000}/g) || [];
-                for (const chunk of chunks) {
-                    await m.reply(`\`\`\`javascript\n${chunk}\n\`\`\``);
-                }
-            } else {
-                await m.reply(`\`\`\`javascript\n${fullCodeText}\n\`\`\``);
-            }
+            await m.reply(fullCodeText);
 
         } catch (err) {
             console.error("crm error:", err);
